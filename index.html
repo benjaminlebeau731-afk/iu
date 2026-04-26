@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Discord Webhook Sender</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; flex-direction: column; align-items: center; padding: 30px; background-color: #2c2f33; color: white; }
+        .config-view { background: #23272a; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 100%; max-width: 500px; }
+        input, textarea { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: 1px solid #444; background: #40444b; color: white; box-sizing: border-box; }
+        button { padding: 10px 20px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; margin-right: 10px; }
+        #startBtn { background: #43b581; color: white; }
+        #startBtn:disabled { background: #2d5d46; cursor: not-allowed; }
+        #stopBtn { background: #f04747; color: white; }
+        #stopBtn:disabled { background: #723232; cursor: not-allowed; }
+        #status { font-weight: bold; color: #7289da; }
+        #log { margin-top: 20px; font-size: 0.85em; max-height: 150px; overflow-y: auto; background: #1e2124; padding: 10px; border-radius: 4px; border: 1px solid #444; }
+        .log-entry { margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+    </style>
+</head>
+<body>
+
+    <h2>Discord Auto-Messenger</h2>
+    
+    <div class="config-view">
+        <label>Webhook URL:</label>
+        <input type="password" id="webhook-url" placeholder="https://discord.com/api/webhooks/...">
+        
+        <label>Message Content:</label>
+        <textarea id="message-text" rows="3">Automated message from HTML app! 🌐</textarea>
+        
+        <label>Interval (Seconds):</label>
+        <input type="number" id="interval-sec" value="60" min="1">
+
+        <p><strong>Status:</strong> <span id="status">Idle</span></p>
+        
+        <button id="startBtn">Start Sending</button>
+        <button id="stopBtn" disabled>Stop</button>
+
+        <div id="log">
+            <div class="log-entry">System ready...</div>
+        </div>
+    </div>
+
+    <script>
+        let timer = null;
+
+        function addLog(msg) {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            logDiv.prepend(entry);
+        }
+
+        async function sendMessage() {
+            const url = document.getElementById('webhook-url').value;
+            const content = document.getElementById('message-text').value;
+
+            if (!url) {
+                addLog("Error: No Webhook URL provided.");
+                stopSequence();
+                return;
+            }
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content })
+                });
+
+                if (response.ok) {
+                    document.getElementById('status').innerText = "Running (Last sent: " + new Date().toLocaleTimeString() + ")";
+                    addLog("Message sent successfully.");
+                } else if (response.status === 429) {
+                    addLog("Error 429: Rate limited. Stopping to stay safe.");
+                    stopSequence();
+                } else {
+                    addLog(`Error ${response.status}: Failed to send.`);
+                }
+            } catch (err) {
+                addLog("Network Error: Could not connect to Discord.");
+            }
+        }
+
+        function stopSequence() {
+            clearInterval(timer);
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('status').innerText = "Stopped.";
+        }
+
+        document.getElementById('startBtn').onclick = () => {
+            const interval = document.getElementById('interval-sec').value * 1000;
+            
+            if (interval < 1000) {
+                alert("Please set an interval of at least 1 second.");
+                return;
+            }
+
+            sendMessage(); // Initial send
+            timer = setInterval(sendMessage, interval);
+            
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('status').innerText = "Running...";
+            addLog("Automation started.");
+        };
+
+        document.getElementById('stopBtn').onclick = stopSequence;
+    </script>
+</body>
+</html>
